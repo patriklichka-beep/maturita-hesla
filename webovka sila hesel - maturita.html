@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="cs">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Advanced Password Security Analyzer</title>
+
+<style>
+:root{
+    --bg:#0f172a;
+    --card:#111827;
+    --primary:#6366f1;
+    --good:#22c55e;
+    --mid:#f59e0b;
+    --bad:#ef4444;
+}
+
+body{
+    margin:0;
+    font-family:system-ui;
+    background:radial-gradient(circle at 20% 20%, #1e293b, #0f172a);
+    display:flex;
+    justify-content:center;
+    align-items:center;
+    min-height:100vh;
+    color:white;
+}
+
+.card{
+    width:100%;
+    max-width:700px;
+    background:var(--card);
+    padding:40px;
+    border-radius:20px;
+    box-shadow:0 40px 80px rgba(0,0,0,.5);
+}
+
+h1{text-align:center;margin-bottom:10px;}
+p{text-align:center;opacity:.7;margin-bottom:30px;}
+
+input{
+    width:100%;
+    padding:16px;
+    border-radius:14px;
+    border:none;
+    outline:none;
+    font-size:16px;
+}
+
+.bar{
+    margin-top:20px;
+    height:14px;
+    background:#1f2937;
+    border-radius:999px;
+    overflow:hidden;
+}
+
+.fill{
+    height:100%;
+    width:0%;
+    transition:.4s ease;
+}
+
+.section{
+    margin-top:20px;
+    font-size:14px;
+    opacity:.9;
+}
+
+button{
+    margin-top:15px;
+    padding:10px 15px;
+    border:none;
+    border-radius:10px;
+    background:var(--primary);
+    color:white;
+    cursor:pointer;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+<h1>🔐 Security Analyzer 3.0</h1>
+<p>Profesionální analýza síly hesla</p>
+
+<div style="position:relative;">
+    <input type="password" id="password" placeholder="Zadej heslo..." style="padding-right:50px;">
+    <button id="toggle" 
+        style="position:absolute; right:10px; top:50%; transform:translateY(-50%);
+        background:none; border:none; cursor:pointer; font-size:18px;">
+        👁️
+    </button>
+</div>
+
+<div class="bar"><div class="fill" id="fill"></div></div>
+
+<div class="section" id="entropy"></div>
+<div class="section" id="crack"></div>
+<div class="section" id="feedback"></div>
+
+<button onclick="generatePassword()">🎲 Vygenerovat silné heslo</button>
+</div>
+
+<script>
+const input=document.getElementById("password");
+const fill=document.getElementById("fill");
+const entropyEl=document.getElementById("entropy");
+const crackEl=document.getElementById("crack");
+const feedback=document.getElementById("feedback"); 
+const toggle = document.getElementById("toggle");
+
+toggle.addEventListener("click", () => {
+    if(input.type === "password"){
+        input.type = "text";
+        toggle.textContent = "🙈";
+    } else {
+        input.type = "password";
+        toggle.textContent = "👁️";
+    }
+});
+
+input.addEventListener("input",()=>analyze(input.value));
+
+function analyze(password){
+    if(!password){
+        fill.style.width="0%";
+        entropyEl.innerHTML="";
+        crackEl.innerHTML="";
+        feedback.innerHTML="";
+        return;
+    }
+
+    const entropy = calculateEntropy(password);
+    const score = Math.min(entropy,100);
+
+    fill.style.width=score+"%";
+    fill.style.background=colorByEntropy(entropy);
+
+    entropyEl.innerHTML="<strong>Entropie:</strong> "+entropy.toFixed(2)+" bitů";
+
+    const crackTimeOffline = estimateCrackTime(entropy,1e12);
+    const crackTimeOnline = estimateCrackTime(entropy,100);
+
+    crackEl.innerHTML=
+        "<strong>Offline útok (GPU):</strong> "+formatTime(crackTimeOffline)+"<br>"+
+        "<strong>Online útok:</strong> "+formatTime(crackTimeOnline);
+
+    feedback.innerHTML=patternCheck(password);
+}
+
+function calculateEntropy(password){
+    let charset=0;
+    if(/[a-z]/.test(password)) charset+=26;
+    if(/[A-Z]/.test(password)) charset+=26;
+    if(/[0-9]/.test(password)) charset+=10;
+    if(/[^A-Za-z0-9]/.test(password)) charset+=32;
+    return password.length * Math.log2(charset || 1);
+}
+
+function estimateCrackTime(entropy, guessesPerSecond){
+    const combinations=Math.pow(2,entropy);
+    return combinations/guessesPerSecond;
+}
+
+function formatTime(seconds){
+    if(seconds<60) return Math.round(seconds)+" sekund";
+    if(seconds<3600) return Math.round(seconds/60)+" minut";
+    if(seconds<86400) return Math.round(seconds/3600)+" hodin";
+    if(seconds<31536000) return Math.round(seconds/86400)+" dní";
+    return Math.round(seconds/31536000)+" let";
+}
+
+function colorByEntropy(e){
+    if(e<40) return "var(--bad)";
+    if(e<60) return "var(--mid)";
+    if(e<80) return "#eab308";
+    return "var(--good)";
+}
+
+function patternCheck(password){
+    let issues=[];
+    if(/(.)\1{2,}/.test(password)) issues.push("Opakující se znaky");
+    if(/123|abc|qwerty/i.test(password)) issues.push("Sekvence nebo klávesnicový vzor");
+    if(password.length<12) issues.push("Krátké heslo");
+
+    if(issues.length===0) return "✅ Bez zjevných slabin";
+    return "<strong>Slabiny:</strong><ul><li>"+issues.join("</li><li>")+"</li></ul>";
+}
+
+function generatePassword(){
+    const chars="ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789!@#$%^&*()";
+    let arr=new Uint32Array(16);
+    crypto.getRandomValues(arr);
+    let pass="";
+    arr.forEach(x=>pass+=chars[x%chars.length]);
+    input.value=pass;
+    analyze(pass);
+}
+</script>
+
+</body>
+</html>
